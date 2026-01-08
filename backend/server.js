@@ -7,6 +7,8 @@ import connectDB from './config/db.js'; // Note: In ESM, extensions (.js) are ma
 // Routes
 import orderRoutes from './routes/orderRoutes.js';
 import shipmentRoutes from './routes/shipmentRoutes.js';
+import settingsRoutes from './routes/settingsRoutes.js';
+import shopifyAuthRoutes from './routes/shopifyAuthRoutes.js';
 
 dotenv.config();
 
@@ -27,6 +29,8 @@ app.get('/', (req, res) => {
 
 app.use('/api/orders', orderRoutes);
 app.use('/api/shipments', shipmentRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/shopify', shopifyAuthRoutes);
 
 app.use((err, req, res, next) => {
   const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
