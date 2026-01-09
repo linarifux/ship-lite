@@ -34,19 +34,33 @@ export const fulfillOrder = async (shopifyOrderId, trackingNumber, carrier, trac
   try {
     const client = await getShopifyClient();
     
-    // Clean ID: Ensure we just have the numeric ID
+    // Ensure we have a clean string ID
     const cleanId = String(shopifyOrderId).replace('gid://shopify/Order/', '');
 
-    // --- STEP 1: Get Fulfillment Order ID (Required for new API) ---
-    // We cannot just fulfill the "Order" directly anymore; we must fulfill the "FulfillmentOrder".
+    console.log(`Checking fulfillment status for Order ID: ${cleanId}`);
+
+    // --- STEP 1: Get Fulfillment Orders ---
     const foResponse = await client.get(`/orders/${cleanId}/fulfillment_orders.json`);
     const fulfillmentOrders = foResponse.data.fulfillment_orders;
 
-    // Find the first 'open' fulfillment order
-    const openOrder = fulfillmentOrders.find(fo => fo.status === 'open' || fo.status === 'in_progress');
+    // DEBUG: Print exactly what Shopify returned
+    console.log("Fulfillment Orders Found:", JSON.stringify(fulfillmentOrders, null, 2));
 
+    // Check if we found ANY fulfillment orders
+    if (!fulfillmentOrders || fulfillmentOrders.length === 0) {
+      throw new Error(`Shopify returned zero fulfillment orders for ID ${cleanId}. The order might be archived or deleted.`);
+    }
+
+    // Find one that is OPEN
+    const openOrder = fulfillmentOrders.find(fo => 
+      fo.status === 'open' || fo.status === 'in_progress'
+    );
+
+    // IF WE FAIL HERE: Tell the user exactly why
     if (!openOrder) {
-      throw new Error('No open fulfillment orders found for this order.');
+      // Collect all statuses found to show in the error
+      const statuses = fulfillmentOrders.map(fo => `${fo.status} (${fo.delivery_method?.method_type || 'shipping'})`).join(', ');
+      throw new Error(`Cannot fulfill. Current Statuses: [${statuses}]. Order must be 'open'.`);
     }
 
     // --- STEP 2: Create Fulfillment ---
@@ -55,8 +69,6 @@ export const fulfillOrder = async (shopifyOrderId, trackingNumber, carrier, trac
         line_items_by_fulfillment_order: [
           {
             fulfillment_order_id: openOrder.id
-            // Note: If you want to fulfill specific items only, you'd list quantity here.
-            // Omitted means "fulfill all available items in this group".
           }
         ],
         tracking_info: {
@@ -68,12 +80,12 @@ export const fulfillOrder = async (shopifyOrderId, trackingNumber, carrier, trac
       }
     };
     
-    // Post to the general fulfillments endpoint (not the order-specific one)
     const response = await client.post('/fulfillments.json', payload);
     return response.data;
 
   } catch (error) {
+    // Log the full error for debugging
     console.error("Shopify Fulfill Error:", error.response?.data || error.message);
-    throw error;
+    throw error; // Throw so the controller catches it
   }
 };

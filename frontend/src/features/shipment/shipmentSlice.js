@@ -1,25 +1,40 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-// 1. Sync Orders from Shopify
-export const syncOrders = createAsyncThunk('shipment/sync', async () => {
-  await axios.post('/api/orders/sync');
-  const response = await axios.get('/api/orders?status=unfulfilled');
-  return response.data;
+// 1. Sync Orders (UPDATED: Now handles errors to stop loading spinner)
+export const syncOrders = createAsyncThunk('shipment/sync', async (_, { rejectWithValue }) => {
+  try {
+    // Step A: Trigger the sync on the backend
+    await axios.post('/api/orders/sync');
+    
+    // Step B: Fetch the latest data from our DB
+    const response = await axios.get('/api/orders?status=unfulfilled');
+    return response.data;
+  } catch (err) {
+    console.error("Sync Failed:", err);
+    return rejectWithValue(err.response?.data?.message || 'Sync failed');
+  }
 });
 
 // 2. Get Rates for an Order
-export const getRates = createAsyncThunk('shipment/rates', async (data) => {
-  const response = await axios.post('/api/shipments/rates', data);
-  return response.data; // { shipmentId, rates }
+export const getRates = createAsyncThunk('shipment/rates', async (data, { rejectWithValue }) => {
+  try {
+    const response = await axios.post('/api/shipments/rates', data);
+    return response.data; // { shipmentId, rates }
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to fetch rates');
+  }
 });
 
 // 3. Buy Label
-export const buyLabel = createAsyncThunk('shipment/buy', async (data) => {
-  const response = await axios.post('/api/shipments/buy', data);
-  console.log(response);
-  
-  return response.data;
+export const buyLabel = createAsyncThunk('shipment/buy', async (data, { rejectWithValue }) => {
+  try {
+    const response = await axios.post('/api/shipments/buy', data);
+    return response.data;
+  } catch (err) {
+    // Extract the error message sent from the backend
+    return rejectWithValue(err.response?.data?.message || 'Failed to buy label');
+  }
 });
 
 const shipmentSlice = createSlice({
@@ -29,43 +44,77 @@ const shipmentSlice = createSlice({
     activeRates: [],
     activeShipmentId: null,
     loading: false,
-    error: null
+    error: null,         // <--- General Error state (Sync/Rates)
+    purchaseError: null  // <--- Specific Purchase Error state (Modal)
   },
   reducers: {
     clearRates: (state) => {
       state.activeRates = [];
       state.activeShipmentId = null;
+      state.purchaseError = null; // Clear error when closing modal
+    },
+    clearError: (state) => {
+      state.error = null;
+      state.purchaseError = null;
     }
   },
   extraReducers: (builder) => {
     builder
-      // Sync
-      .addCase(syncOrders.pending, (state) => { state.loading = true; })
+      // --- SYNC ORDERS HANDLERS ---
+      .addCase(syncOrders.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(syncOrders.fulfilled, (state, action) => {
         state.loading = false;
         state.orders = action.payload;
       })
-      
-      // Get Rates
-      .addCase(getRates.pending, (state) => { state.loading = true; })
+      .addCase(syncOrders.rejected, (state, action) => {
+        state.loading = false; // Stop spinner
+        state.error = action.payload; // Show error toast/message
+      })
+
+      // --- GET RATES HANDLERS ---
+      .addCase(getRates.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(getRates.fulfilled, (state, action) => {
         state.loading = false;
         state.activeRates = action.payload.rates;
         state.activeShipmentId = action.payload.shipmentId;
       })
+      .addCase(getRates.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
 
-      // Buy Label
-      .addCase(buyLabel.pending, (state) => { state.loading = true; })
+      // --- BUY LABEL HANDLERS ---
+      .addCase(buyLabel.pending, (state) => { 
+        state.loading = true; 
+        state.purchaseError = null; 
+      })
       .addCase(buyLabel.fulfilled, (state, action) => {
         state.loading = false;
-        // Remove the fulfilled order from the list locally
+        
+        // Handle the "Warning" case (Label bought, Shopify failed)
+        if (action.payload.warning) {
+          state.error = action.payload.warning; 
+        }
+
+        // Remove order from list
         state.orders = state.orders.filter(o => o._id !== action.payload.order._id);
+        
+        // Reset modal state
         state.activeRates = [];
         state.activeShipmentId = null;
-        // In a real app, you might show a "Success" toast here
+      })
+      .addCase(buyLabel.rejected, (state, action) => {
+        state.loading = false;
+        state.purchaseError = action.payload; // Store the specific error message
       });
   }
 });
 
-export const { clearRates } = shipmentSlice.actions;
+export const { clearRates, clearError } = shipmentSlice.actions;
 export default shipmentSlice.reducer;

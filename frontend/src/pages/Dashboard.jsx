@@ -1,20 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { syncOrders, getRates, buyLabel, clearRates } from '../features/shipment/shipmentSlice';
-import { RefreshCw, Store, Link as LinkIcon } from 'lucide-react';
+import { syncOrders, getRates, buyLabel, clearRates, clearError } from '../features/shipment/shipmentSlice';
+import { RefreshCw, Store, Link as LinkIcon, AlertTriangle, X } from 'lucide-react';
 
 import OrderList from '../components/dashboard/OrderList';
 import RateModal from '../components/dashboard/RateModal';
 
 const Dashboard = () => {
   const dispatch = useDispatch();
-  const { orders, activeRates, activeShipmentId, loading } = useSelector((state) => state.shipment);
+  
+  // Grab 'error' (Global) and 'purchaseError' (Modal specific)
+  const { orders, activeRates, activeShipmentId, loading, purchaseError, error } = useSelector((state) => state.shipment);
   
   const [selectedOrder, setSelectedOrder] = useState(null);
   
   // --- OAuth State ---
   const [shopUrl, setShopUrl] = useState('');
-  // Check localStorage first to persist login across reloads
   const [isConnected, setIsConnected] = useState(!!localStorage.getItem('shop_connected'));
 
   // 1. Check for success callback from Shopify (URL params)
@@ -25,12 +26,12 @@ const Dashboard = () => {
       localStorage.setItem('shop_connected', 'true');
       localStorage.setItem('shop_name', params.get('shop'));
       
-      // Clean up the URL bar so the params don't stick around
+      // Clean up the URL bar
       window.history.replaceState({}, document.title, "/");
     }
   }, []);
 
-  // 2. Initial Data Load (Only if connected)
+  // 2. Initial Data Load
   useEffect(() => {
     if (isConnected) {
       dispatch(syncOrders());
@@ -41,43 +42,54 @@ const Dashboard = () => {
 
   const handleConnect = () => {
     if (!shopUrl) return;
-    
-    // Normalize Input: remove https:// and trailing slash
     let cleanShop = shopUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    
-    // Ensure .myshopify.com is present
     if (!cleanShop.includes('.myshopify.com')) {
       cleanShop += '.myshopify.com';
     }
-    
-    // Redirect to Backend Auth
-    // NOTE: Ensure your Backend is running on port 5000
     window.location.href = `http://localhost:5000/api/shopify/auth?shop=${cleanShop}`;
   };
 
   const handleGetRates = (order) => {
     setSelectedOrder(order);
-    // Hardcoded dimensions for MVP (In real app, add inputs)
     dispatch(getRates({ 
       orderId: order._id, 
-      weight: 16, 
-      length: 10, 
-      width: 6, 
-      height: 4 
+      weight: 16, length: 10, width: 6, height: 4 
     }));
   };
 
-  const handleBuyLabel = (rateId) => {
+  // --- UPDATED: Auto-Download Label Handler ---
+  const handleBuyLabel = async (rateId) => {
     if (!selectedOrder) return;
-    dispatch(buyLabel({ 
-      orderId: selectedOrder._id, 
-      shipmentId: activeShipmentId, 
-      rateId 
-    })).then((result) => {
-        if (result.payload && result.payload.labelUrl) {
-            window.open(result.payload.labelUrl, '_blank');
-        }
-    });
+
+    try {
+      // We use .unwrap() so we can await the result or catch the error immediately
+      const result = await dispatch(buyLabel({ 
+        orderId: selectedOrder._id, 
+        shipmentId: activeShipmentId, 
+        rateId 
+      })).unwrap();
+
+      // If successful, trigger download
+      if (result.labelUrl) {
+        const link = document.createElement('a');
+        link.href = result.labelUrl;
+        link.target = '_blank'; // New tab is safer for PDFs
+        // Suggest a filename
+        link.setAttribute('download', `Label-${selectedOrder.orderNumber}.pdf`);
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      
+      // Close the modal only on success
+      closeModal();
+
+    } catch (err) {
+      console.error("Purchase failed:", err);
+      // We don't need to do anything else here because 
+      // 'purchaseError' in Redux will automatically show the error in the Modal.
+    }
   };
 
   const closeModal = () => {
@@ -85,7 +97,7 @@ const Dashboard = () => {
     setSelectedOrder(null);
   };
 
-  // --- RENDER: CONNECT SCREEN (If not logged in) ---
+  // --- RENDER: CONNECT SCREEN ---
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
@@ -93,7 +105,6 @@ const Dashboard = () => {
           <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
             <Store size={32} className="text-green-600" />
           </div>
-          
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Connect Your Store</h2>
           <p className="text-gray-500 mb-8">Enter your Shopify store URL to sync orders and start shipping.</p>
           
@@ -112,14 +123,12 @@ const Dashboard = () => {
                 <LinkIcon size={18} className="absolute left-3 top-3.5 text-gray-400" />
               </div>
             </div>
-
             <button 
               onClick={handleConnect}
               className="w-full bg-green-600 hover:bg-green-700 text-white p-3 rounded-lg font-bold transition-all active:scale-95 shadow-lg shadow-green-200"
             >
               Connect Shopify
             </button>
-            
             <p className="text-xs text-center text-gray-400 mt-4">
               You will be redirected to Shopify to approve access.
             </p>
@@ -129,10 +138,24 @@ const Dashboard = () => {
     );
   }
 
-  // --- RENDER: DASHBOARD (If logged in) ---
+  // --- RENDER: DASHBOARD ---
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
       <main className="max-w-5xl mx-auto px-6 py-8">
+        
+        {/* GLOBAL ERROR BANNER */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="text-red-600" size={20} />
+              <p className="text-red-800 font-medium">{error}</p>
+            </div>
+            <button onClick={() => dispatch(clearError())} className="text-red-400 hover:text-red-600">
+              <X size={18} />
+            </button>
+          </div>
+        )}
+
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
@@ -168,6 +191,7 @@ const Dashboard = () => {
         rates={activeRates}
         onBuy={handleBuyLabel}
         loading={loading}
+        error={purchaseError} 
       />
     </div>
   );

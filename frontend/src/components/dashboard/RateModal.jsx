@@ -1,7 +1,7 @@
 import React from 'react';
-import { X, Truck, Check } from 'lucide-react';
+import { X, Truck, AlertCircle } from 'lucide-react';
 
-const RateModal = ({ isOpen, onClose, rates, onBuy, loading }) => {
+const RateModal = ({ isOpen, onClose, rates, onBuy, loading, error }) => {
   if (!isOpen) return null;
 
   return (
@@ -15,6 +15,14 @@ const RateModal = ({ isOpen, onClose, rates, onBuy, loading }) => {
             <X size={20} />
           </button>
         </div>
+
+        {/* ERROR ALERT (For Purchase Failures) */}
+        {error && (
+          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle size={18} className="text-red-600 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
 
         {/* Rate List */}
         <div className="max-h-[400px] overflow-y-auto p-2">
@@ -38,12 +46,14 @@ const RateModal = ({ isOpen, onClose, rates, onBuy, loading }) => {
                   <p className="font-bold text-gray-900">${rate.rate}</p>
                   <p className="text-xs text-gray-500">{rate.delivery_days} days</p>
                 </div>
+                
+                {/* UPDATED BUTTON: Text instead of Icon */}
                 <button
                   onClick={() => onBuy(rate.id)}
                   disabled={loading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
-                  <Check size={18} />
+                  {loading ? 'Buying...' : 'Buy Label'}
                 </button>
               </div>
             </div>

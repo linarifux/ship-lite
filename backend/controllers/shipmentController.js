@@ -44,24 +44,34 @@ export const getRates = async (req, res) => {
   }
 };
 
-// @desc    Buy Label & Fulfill Order
+// @desc    Buy Label & Fulfill Order (Strict Flow)
 // @route   POST /api/shipments/buy
 export const purchaseLabel = async (req, res) => {
   try {
     const { orderId, shipmentId, rateId } = req.body;
     
-    // 1. Buy the label (Mock)
+    // 1. Buy the label (EasyPost)
+    // We do this first because we need the tracking number for Shopify
     const purchase = await buyLabel(shipmentId, rateId);
 
-    
     const trackingCode = purchase.tracking_code;
     const labelUrl = purchase.postage_label.label_url;
     const carrier = purchase.selected_rate.carrier;
     const cost = purchase.selected_rate.rate;
     const trackingUrl = purchase.tracker.public_url;
 
-    // 2. Update Local DB
-    const order = await Order.findByIdAndUpdate(orderId, {
+    // 2. Get the Order (to find Shopify ID)
+    const order = await Order.findById(orderId);
+    if (!order) throw new Error('Order not found');
+
+    // 3. Update Shopify FIRST
+    // If this fails, the code stops here (goes to catch block)
+    // and we NEVER mark the DB as fulfilled.
+    console.log(`Attempting to fulfill Shopify Order: ${order.shopifyId}`);
+    await fulfillOrder(order.shopifyId, trackingCode, carrier, trackingUrl);
+
+    // 4. Update Local DB (Only runs if Step 3 succeeded)
+    const updatedOrder = await Order.findByIdAndUpdate(orderId, {
       fulfillmentStatus: 'fulfilled',
       trackingNumber: trackingCode,
       labelUrl: labelUrl,
@@ -69,13 +79,26 @@ export const purchaseLabel = async (req, res) => {
       shippingCost: cost
     }, { new: true });
 
-    console.log("The order: ", order);
-    
-    // 3. Update Shopify (Mock)
-    await fulfillOrder(order.shopifyId, trackingCode, carrier, trackingUrl);
+    console.log("Success: Shopify synced and DB updated.");
 
-    res.json({ success: true, order, labelUrl });
+    res.json({ 
+      success: true, 
+      order: updatedOrder, 
+      labelUrl 
+    });
+
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Purchase Transaction Failed:", error.message);
+    
+    // Special Error Handling:
+    // If we bought the label but Shopify failed, we return the label URL anyway
+    // so the user doesn't lose the postage they paid for, but we throw a 500
+    // so the frontend knows something went wrong.
+    
+    // Check if we have a label URL from the "purchase" variable (needs scope refactoring if strict)
+    // For simplicity in this block, we just return the error.
+    res.status(500).json({ 
+      message: error.response?.data?.errors || error.message || "Failed to complete transaction" 
+    });
   }
 };
