@@ -1,36 +1,48 @@
 import mongoose from 'mongoose';
 
 const OrderSchema = new mongoose.Schema({
-  shopifyId: { type: String, required: true, unique: true },
+  // ADDED: Shop Domain (for Multi-tenancy)
+  shop: { type: String, required: true, index: true }, 
+  
+  // ADDED: Shopify Order ID (Unique identifier from Shopify)
+  orderId: { type: Number, required: true, unique: true }, 
+  
   orderNumber: { type: String, required: true },
+  email: { type: String },
+  financialStatus: { type: String },
+  fulfillmentStatus: { type: String, default: 'unfulfilled' },
+  totalPrice: { type: String },
+  currency: { type: String },
+  
   customer: {
-    name: String,
-    email: String,
+    name: { type: String },
+    email: { type: String },
+    phone: { type: String },
     address: {
-      street1: String,
-      city: String,
-      state: String,
-      zip: String,
-      country: String,
-      phone: String
+      line1: { type: String },
+      line2: { type: String },
+      city: { type: String },
+      state: { type: String },
+      zip: { type: String },
+      country: { type: String }
     }
   },
-  items: [{
-    title: String,
-    quantity: Number,
-    grams: Number,
-    sku: String
+  
+  lineItems: [{
+    name: { type: String },
+    quantity: { type: Number },
+    grams: { type: Number },
+    sku: { type: String },
+    price: { type: String }
   }],
-  fulfillmentStatus: { 
-    type: String, 
-    enum: ['unfulfilled', 'fulfilled'],
-    default: 'unfulfilled' 
-  },
-  trackingNumber: String,
-  labelUrl: String,
-  carrier: String,
-  service: String,
-  shippingCost: Number,
+
+  totalWeight: { type: Number, default: 0 },
+  
+  // Tracking info (for when we fulfill it)
+  trackingNumber: { type: String },
+  carrier: { type: String },
+  labelUrl: { type: String },
+
 }, { timestamps: true });
 
 export default mongoose.model('Order', OrderSchema);
