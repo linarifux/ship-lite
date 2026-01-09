@@ -14,7 +14,9 @@ export const install = (req, res) => {
 
   // Generate a random nonce for security
   const state = crypto.randomBytes(16).toString('hex');
-  const redirectUri = `${process.env.HOST}/api/shopify/callback`;
+  const host = process.env.NODE_ENV === 'development' ? process.env.HOST : 'https://ship-lite.vercel.app';
+  const redirectUri = `${host}/api/shopify/callback`;
+
   
   // Build the authorization URL
   const installUrl = `https://${shop}/admin/oauth/authorize?client_id=${process.env.SHOPIFY_API_KEY}&scope=${process.env.SHOPIFY_SCOPES}&state=${state}&redirect_uri=${redirectUri}`;
