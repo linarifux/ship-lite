@@ -1,29 +1,45 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { Menu } from 'lucide-react';
+import { Menu, Ship } from 'lucide-react'; // Import Menu icon
 
 const AdminLayout = () => {
-  return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Left Sidebar */}
-      <Sidebar />
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+  return (
+    <div className="flex min-h-screen bg-gray-50">
+      
+      {/* SIDEBAR (Responsive) */}
+      <Sidebar 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)} 
+      />
+
+      {/* MAIN CONTENT WRAPPER */}
+      <div className="flex-1 flex flex-col min-w-0">
         
-        {/* Mobile Header (Only visible on small screens) */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:hidden shrink-0">
-          <span className="font-bold text-gray-800">ShipLite</span>
-          <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-md">
-            <Menu size={24} />
-          </button>
+        {/* MOBILE HEADER (Only visible on small screens) */}
+        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 md:hidden sticky top-0 z-20">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-600 p-1.5 rounded-lg text-white">
+                <Ship size={20} />
+              </div>
+              <span className="text-lg font-bold text-gray-800 tracking-tight">ShipLite</span>
+            </div>
+            
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            >
+              <Menu size={24} />
+            </button>
         </header>
 
-        {/* Scrollable Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          <Outlet /> {/* This is where Dashboard or Settings renders */}
+        {/* PAGE CONTENT */}
+        <main className="flex-1 overflow-auto">
+          <Outlet />
         </main>
+        
       </div>
     </div>
   );

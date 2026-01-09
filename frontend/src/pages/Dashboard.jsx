@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { syncOrders, getRates, buyLabel, clearRates, clearError } from '../features/shipment/shipmentSlice';
-import { RefreshCw, Store, Link as LinkIcon, AlertTriangle, X } from 'lucide-react';
+import { RefreshCw, Store, Link as LinkIcon, AlertTriangle, X, Package, MapPin, Calendar, Box, Truck } from 'lucide-react';
 
-import OrderList from '../components/dashboard/OrderList';
 import RateModal from '../components/dashboard/RateModal';
 
 const Dashboard = () => {
@@ -27,7 +26,7 @@ const Dashboard = () => {
       localStorage.setItem('shop_name', params.get('shop'));
       
       // Clean up the URL bar
-      window.history.replaceState({}, document.title, "/");
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
@@ -57,44 +56,40 @@ const Dashboard = () => {
     }));
   };
 
-  // --- UPDATED: Auto-Download Label Handler ---
   const handleBuyLabel = async (rateId) => {
     if (!selectedOrder) return;
 
     try {
-      // We use .unwrap() so we can await the result or catch the error immediately
       const result = await dispatch(buyLabel({ 
         orderId: selectedOrder._id, 
         shipmentId: activeShipmentId, 
         rateId 
       })).unwrap();
 
-      // If successful, trigger download
       if (result.labelUrl) {
         const link = document.createElement('a');
         link.href = result.labelUrl;
-        link.target = '_blank'; // New tab is safer for PDFs
-        // Suggest a filename
+        link.target = '_blank'; 
         link.setAttribute('download', `Label-${selectedOrder.orderNumber}.pdf`);
-        
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
       }
-      
-      // Close the modal only on success
       closeModal();
-
     } catch (err) {
       console.error("Purchase failed:", err);
-      // We don't need to do anything else here because 
-      // 'purchaseError' in Redux will automatically show the error in the Modal.
     }
   };
 
   const closeModal = () => {
     dispatch(clearRates());
     setSelectedOrder(null);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric'
+    });
   };
 
   // --- RENDER: CONNECT SCREEN ---
@@ -107,7 +102,6 @@ const Dashboard = () => {
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Connect Your Store</h2>
           <p className="text-gray-500 mb-8">Enter your Shopify store URL to sync orders and start shipping.</p>
-          
           <div className="space-y-4 text-left">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Store URL</label>
@@ -129,9 +123,7 @@ const Dashboard = () => {
             >
               Connect Shopify
             </button>
-            <p className="text-xs text-center text-gray-400 mt-4">
-              You will be redirected to Shopify to approve access.
-            </p>
+            <p className="text-xs text-center text-gray-400 mt-4">You will be redirected to Shopify to approve access.</p>
           </div>
         </div>
       </div>
@@ -141,7 +133,7 @@ const Dashboard = () => {
   // --- RENDER: DASHBOARD ---
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         
         {/* GLOBAL ERROR BANNER */}
         {error && (
@@ -175,16 +167,102 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Content */}
-        <OrderList 
-          orders={orders} 
-          onGetRates={handleGetRates} 
-          loading={loading} 
-        />
+        {/* CONTENT AREA */}
+        {loading && orders.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">Syncing orders...</div>
+        ) : orders.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Package className="text-gray-300" size={32} />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900">All caught up!</h3>
+            <p className="text-gray-500">No unfulfilled orders found.</p>
+          </div>
+        ) : (
+          <>
+            {/* --- DESKTOP VIEW (Table) --- */}
+            <div className="hidden md:block bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Order</th>
+                    <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Date</th>
+                    <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Customer</th>
+                    <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase">Items</th>
+                    <th className="py-4 px-6 text-xs font-semibold text-gray-500 uppercase text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {orders.map((order) => (
+                    <tr key={order._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="py-4 px-6 font-medium text-gray-900">{order.orderNumber}</td>
+                      <td className="py-4 px-6 text-gray-500 text-sm">{formatDate(order.createdAt)}</td>
+                      <td className="py-4 px-6 text-gray-900 font-medium">
+                        {order.customer.name}
+                        <div className="text-xs text-gray-400 font-normal">{order.customer.address.city}, {order.customer.address.state}</div>
+                      </td>
+                      <td className="py-4 px-6 text-gray-600 text-sm">{order.lineItems?.length || 1} items</td>
+                      <td className="py-4 px-6 text-right">
+                        <button 
+                          onClick={() => handleGetRates(order)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all active:scale-95"
+                        >
+                          Get Rates
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
+            {/* --- MOBILE VIEW (Cards) --- */}
+            <div className="md:hidden space-y-4">
+              {orders.map((order) => (
+                <div key={order._id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4">
+                  {/* Header: ID & Date */}
+                  <div className="flex justify-between items-start border-b border-gray-100 pb-3">
+                    <div>
+                      <span className="text-xs text-gray-500 uppercase font-semibold">Order</span>
+                      <p className="text-lg font-bold text-gray-900">{order.orderNumber}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-gray-500 text-sm">
+                      <Calendar size={14} />
+                      {formatDate(order.createdAt)}
+                    </div>
+                  </div>
+
+                  {/* Info Block */}
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 text-gray-400"><MapPin size={18} /></div>
+                      <div>
+                        <p className="font-medium text-gray-900">{order.customer.name}</p>
+                        <p className="text-sm text-gray-500">{order.customer.address.city}, {order.customer.address.state}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-gray-400"><Box size={18} /></div>
+                      <p className="text-sm text-gray-700">{order.lineItems?.length || 1} Items to ship</p>
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <button 
+                    onClick={() => handleGetRates(order)}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-lg font-bold active:scale-95 transition-all shadow-md shadow-blue-200"
+                  >
+                    <Truck size={18} />
+                    Get Shipping Rates
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </main>
 
-      {/* Popups */}
+      {/* Rate Modal */}
       <RateModal 
         isOpen={!!selectedOrder && activeRates.length > 0}
         onClose={closeModal}
