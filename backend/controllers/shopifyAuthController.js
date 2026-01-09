@@ -14,7 +14,8 @@ export const install = (req, res) => {
 
   // Generate a random nonce for security
   const state = crypto.randomBytes(16).toString('hex');
-  const host = process.env.NODE_ENV === 'development' ? process.env.HOST : 'https://ship-lite.vercel.app';
+  // const host = process.env.NODE_ENV === 'development' ? process.env.HOST : 'https://ship-lite.vercel.app';
+  const host = 'https://ship-lite.vercel.app';
   const redirectUri = `${host}/api/shopify/callback`;
 
   
