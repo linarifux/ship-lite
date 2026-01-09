@@ -11,7 +11,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:5000', // Points to your Node Backend
+        target: 'https://ship-lite.vercel.app', // Points to Backend
         changeOrigin: true,
         secure: false,
       },
