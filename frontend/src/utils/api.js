@@ -1,7 +1,14 @@
 import axios from 'axios';
 
+  const BACKEND_URL =
+    import.meta.env.VITE_ENV === "development"
+      ? import.meta.env.VITE_DEV_BACKEND_URL
+      : import.meta.env.VITE_PROD_BACKEND_URL;
+
+console.log(BACKEND_URL);
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000',
+  baseURL: BACKEND_URL,
 });
 
 // ADD THIS: Request Interceptor

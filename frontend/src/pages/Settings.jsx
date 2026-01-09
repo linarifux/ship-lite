@@ -57,13 +57,18 @@ const Settings = () => {
     dispatch(saveSettings({ shipFrom: formData }));
   };
 
+    const BACKEND_URL =
+    import.meta.env.VITE_ENV === "development"
+      ? import.meta.env.VITE_DEV_BACKEND_URL
+      : import.meta.env.VITE_PROD_BACKEND_URL;
+
   const handleConnect = () => {
     if (!shopUrl) return;
     let cleanShop = shopUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
     if (!cleanShop.includes('.myshopify.com')) {
       cleanShop += '.myshopify.com';
     }
-    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/api/shopify/auth?shop=${cleanShop}`;
+    window.location.href = `${BACKEND_URL}/api/shopify/auth?shop=${cleanShop}`;
   };
 
   // --- RENDER: CONNECT SCREEN ---
