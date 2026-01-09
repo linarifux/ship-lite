@@ -45,7 +45,7 @@ const Dashboard = () => {
     if (!cleanShop.includes('.myshopify.com')) {
       cleanShop += '.myshopify.com';
     }
-    window.location.href = `http://localhost:5000/api/shopify/auth?shop=${cleanShop}`;
+    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/api/shopify/auth?shop=${cleanShop}`;
   };
 
   const handleGetRates = (order) => {
