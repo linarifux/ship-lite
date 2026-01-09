@@ -8,7 +8,7 @@ import axios from 'axios';
 console.log(BACKEND_URL);
 
 const api = axios.create({
-  baseURL: BACKEND_URL,
+  baseURL: 'https://ship-lite.vercel.app',
 });
 
 // ADD THIS: Request Interceptor
