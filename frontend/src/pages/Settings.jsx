@@ -1,20 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSettings, saveSettings, resetStatus } from '../features/settings/settingsSlice';
-import { Save, MapPin } from 'lucide-react';
+import { Save, MapPin, Store, Link as LinkIcon } from 'lucide-react';
 
 const Settings = () => {
   const dispatch = useDispatch();
   const { shipFrom, loading, success } = useSelector((state) => state.settings);
   
+  // --- Auth State ---
+  const [shopUrl, setShopUrl] = useState('');
+  const [isConnected, setIsConnected] = useState(!!localStorage.getItem('shop_connected'));
+
   // Local state for form input
   const [formData, setFormData] = useState({
     company: '', street1: '', street2: '', city: '', state: '', zip: '', phone: ''
   });
 
+  // 1. Check for success callback from Shopify (URL params)
   useEffect(() => {
-    dispatch(fetchSettings());
-  }, [dispatch]);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connected')) {
+      setIsConnected(true);
+      localStorage.setItem('shop_connected', 'true');
+      localStorage.setItem('shop_name', params.get('shop'));
+      
+      // Clean up the URL bar
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  // 2. Load Settings (Only if connected)
+  useEffect(() => {
+    if (isConnected) {
+      dispatch(fetchSettings());
+    }
+  }, [dispatch, isConnected]);
 
   // Sync Redux state to Local state when data loads
   useEffect(() => {
@@ -38,6 +58,56 @@ const Settings = () => {
     dispatch(saveSettings({ shipFrom: formData }));
   };
 
+  const handleConnect = () => {
+    if (!shopUrl) return;
+    let cleanShop = shopUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    if (!cleanShop.includes('.myshopify.com')) {
+      cleanShop += '.myshopify.com';
+    }
+    window.location.href = `http://localhost:5000/api/shopify/auth?shop=${cleanShop}`;
+  };
+
+  // --- RENDER: CONNECT SCREEN (If not logged in) ---
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-gray-100">
+          <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Store size={32} className="text-green-600" />
+          </div>
+          
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Connect Your Store</h2>
+          <p className="text-gray-500 mb-8">Enter your Shopify store URL to manage your warehouse settings.</p>
+          
+          <div className="space-y-4 text-left">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Store URL</label>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  placeholder="my-brand.myshopify.com"
+                  className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition"
+                  value={shopUrl}
+                  onChange={(e) => setShopUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
+                />
+                <LinkIcon size={18} className="absolute left-3 top-3.5 text-gray-400" />
+              </div>
+            </div>
+
+            <button 
+              onClick={handleConnect}
+              className="w-full bg-green-600 hover:bg-green-700 text-white p-3 rounded-lg font-bold transition-all active:scale-95 shadow-lg shadow-green-200"
+            >
+              Connect Shopify
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDER: SETTINGS FORM (If logged in) ---
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
       <main className="max-w-2xl mx-auto px-6 py-12">

@@ -16,6 +16,16 @@ export const syncOrders = createAsyncThunk('shipment/sync', async (_, { rejectWi
   }
 });
 
+// NEW: Fetch Shipment History (Fulfilled Orders)
+export const fetchHistory = createAsyncThunk('shipment/history', async (_, { rejectWithValue }) => {
+  try {
+    const response = await axios.get('/api/orders?status=fulfilled');
+    return response.data;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || 'Failed to fetch history');
+  }
+});
+
 // 2. Get Rates for an Order
 export const getRates = createAsyncThunk('shipment/rates', async (data, { rejectWithValue }) => {
   try {
@@ -40,12 +50,13 @@ export const buyLabel = createAsyncThunk('shipment/buy', async (data, { rejectWi
 const shipmentSlice = createSlice({
   name: 'shipment',
   initialState: {
-    orders: [],
+    orders: [],        // Unfulfilled orders
+    history: [],       // NEW: Fulfilled orders
     activeRates: [],
     activeShipmentId: null,
     loading: false,
-    error: null,         // <--- General Error state (Sync/Rates)
-    purchaseError: null  // <--- Specific Purchase Error state (Modal)
+    error: null,         // General Error state (Sync/Rates)
+    purchaseError: null  // Specific Purchase Error state (Modal)
   },
   reducers: {
     clearRates: (state) => {
@@ -72,6 +83,20 @@ const shipmentSlice = createSlice({
       .addCase(syncOrders.rejected, (state, action) => {
         state.loading = false; // Stop spinner
         state.error = action.payload; // Show error toast/message
+      })
+
+      // --- FETCH HISTORY HANDLERS (NEW) ---
+      .addCase(fetchHistory.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchHistory.fulfilled, (state, action) => {
+        state.loading = false;
+        state.history = action.payload;
+      })
+      .addCase(fetchHistory.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       })
 
       // --- GET RATES HANDLERS ---

@@ -5,9 +5,8 @@ import { LayoutDashboard, Package, Settings, Truck, LogOut, Ship } from 'lucide-
 const Sidebar = () => {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/orders', label: 'Orders', icon: Package }, // Assuming you might split these later
-    { path: '/shipments', label: 'Shipments', icon: Truck }, // Future: History page
-    { path: '/settings', label: 'Settings', icon: Settings },
+    { path: '/shipments', label: 'Shipments', icon: Truck }, 
+    { path: '/settings', label: 'Settings', icon: Settings }
   ];
 
   return (
@@ -42,13 +41,13 @@ const Sidebar = () => {
         </nav>
       </div>
 
-      {/* Bottom Section (User/Logout) */}
+      {/* Bottom Section (User/Logout)
       <div className="p-4 border-t border-gray-100">
         <button className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors">
           <LogOut size={20} />
           Sign Out
         </button>
-      </div>
+      </div> */}
     </aside>
   );
 };
