@@ -1,26 +1,36 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { syncOrders, getRates, buyLabel, clearRates, clearError } from '../features/shipment/shipmentSlice';
-import { RefreshCw, Store, Link as LinkIcon, AlertTriangle, X, Package, MapPin, Calendar, Box, Truck, ExternalLink } from 'lucide-react';
+import { RefreshCw, Store, Link as LinkIcon, AlertTriangle, X, Package, MapPin, Calendar, Box, Truck } from 'lucide-react';
 
 import RateModal from '../components/dashboard/RateModal';
-
-// THE PROVIDED INSTALL LINK
-const INSTALL_LINK = "https://admin.shopify.com/oauth/install_custom_app?client_id=ae0971037092ebc9767a3124723f2b49&no_redirect=true&signature=eyJleHBpcmVzX2F0IjoxNzY4NTAyNTY4LCJwZXJtYW5lbnRfZG9tYWluIjoiYXF1YWx1cC5teXNob3BpZnkuY29tIiwiY2xpZW50X2lkIjoiYWUwOTcxMDM3MDkyZWJjOTc2N2EzMTI0NzIzZjJiNDkiLCJwdXJwb3NlIjoiY3VzdG9tX2FwcCIsIm1lcmNoYW50X29yZ2FuaXphdGlvbl9pZCI6MTMwMzkxMzgzfQ%3D%3D--c4d7f2ab161323ac3a30499ad0d9b91cd2ab3386";
 
 const Dashboard = () => {
   const dispatch = useDispatch();
   
-  // Grab Redux state
+  // Grab 'error' (Global) and 'purchaseError' (Modal specific)
   const { orders, activeRates, activeShipmentId, loading, purchaseError, error } = useSelector((state) => state.shipment);
   
   const [selectedOrder, setSelectedOrder] = useState(null);
   
-  // --- Auth State ---
-  // We default 'isConnected' to true if it exists in localStorage
+  // --- OAuth State ---
+  const [shopUrl, setShopUrl] = useState('');
   const [isConnected, setIsConnected] = useState(!!localStorage.getItem('shop_connected'));
 
-  // 1. Initial Data Load
+  // 1. Check for success callback from Shopify (URL params)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connected')) {
+      setIsConnected(true);
+      localStorage.setItem('shop_connected', 'true');
+      localStorage.setItem('shop_name', params.get('shop'));
+      
+      // Clean up the URL bar
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  // 2. Initial Data Load
   useEffect(() => {
     if (isConnected) {
       dispatch(syncOrders());
@@ -30,16 +40,12 @@ const Dashboard = () => {
   // --- Handlers ---
 
   const handleConnect = () => {
-    // 1. Open the Shopify Install Link in a new tab
-    window.open(INSTALL_LINK, '_blank');
-
-    // 2. "Log In" the user locally immediately
-    // Since the link is specific to 'aqualup', we hardcode the name for display
-    localStorage.setItem('shop_connected', 'true');
-    localStorage.setItem('shop_name', 'aqualup.myshopify.com');
-    
-    // 3. Update State to show Dashboard
-    setIsConnected(true);
+    if (!shopUrl) return;
+    let cleanShop = shopUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    if (!cleanShop.includes('.myshopify.com')) {
+      cleanShop += '.myshopify.com';
+    }
+    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/api/shopify/auth?shop=${cleanShop}`;
   };
 
   const handleGetRates = (order) => {
@@ -86,7 +92,7 @@ const Dashboard = () => {
     });
   };
 
-  // --- RENDER: CONNECT SCREEN (New "Install Button" Version) ---
+  // --- RENDER: CONNECT SCREEN ---
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
@@ -94,28 +100,37 @@ const Dashboard = () => {
           <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
             <Store size={32} className="text-green-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Connect Store</h2>
-          <p className="text-gray-500 mb-8">Click below to install the Custom App on <strong>aqualup.myshopify.com</strong>.</p>
-          
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Connect Your Store</h2>
+          <p className="text-gray-500 mb-8">Enter your Shopify store URL to sync orders and start shipping.</p>
           <div className="space-y-4 text-left">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Store URL</label>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  placeholder="my-brand.myshopify.com"
+                  className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition"
+                  value={shopUrl}
+                  onChange={(e) => setShopUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
+                />
+                <LinkIcon size={18} className="absolute left-3 top-3.5 text-gray-400" />
+              </div>
+            </div>
             <button 
               onClick={handleConnect}
-              className="w-full bg-green-600 hover:bg-green-700 text-white p-4 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-green-200 flex items-center justify-center gap-2"
+              className="w-full bg-green-600 hover:bg-green-700 text-white p-3 rounded-lg font-bold transition-all active:scale-95 shadow-lg shadow-green-200"
             >
-              <span>Install & Connect App</span>
-              <ExternalLink size={18} />
+              Connect Shopify
             </button>
-            
-            <p className="text-xs text-center text-gray-400 mt-4">
-              This will open Shopify in a new tab. Once installed, your dashboard here will activate.
-            </p>
+            <p className="text-xs text-center text-gray-400 mt-4">You will be redirected to Shopify to approve access.</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // --- RENDER: DASHBOARD (Standard View) ---
+  // --- RENDER: DASHBOARD ---
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
