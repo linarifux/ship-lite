@@ -21,10 +21,7 @@ import RateModal from "../components/dashboard/RateModal";
 import OrderList from "../components/dashboard/OrderList"; // <--- IMPORT HERE
 
 const Dashboard = () => {
-  const BACKEND_URL =
-    import.meta.env.VITE_ENV === "development"
-      ? import.meta.env.VITE_DEV_BACKEND_URL
-      : import.meta.env.VITE_PROD_BACKEND_URL;
+  const BACKEND_URL = 'https://ship-lite.vercel.app'
 
   const dispatch = useDispatch();
 
