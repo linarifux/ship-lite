@@ -1,14 +1,15 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import api from '../../utils/api'; // <--- UPDATED: Import the new API utility
 
-// 1. Sync Orders (UPDATED: Now handles errors to stop loading spinner)
+// 1. Sync Orders
 export const syncOrders = createAsyncThunk('shipment/sync', async (_, { rejectWithValue }) => {
   try {
+    // UPDATED: Use 'api' instead of 'axios'
     // Step A: Trigger the sync on the backend
-    await axios.post('/api/orders/sync');
+    await api.post('/api/orders/sync');
     
     // Step B: Fetch the latest data from our DB
-    const response = await axios.get('/api/orders?status=unfulfilled');
+    const response = await api.get('/api/orders?status=unfulfilled');
     return response.data;
   } catch (err) {
     console.error("Sync Failed:", err);
@@ -19,7 +20,7 @@ export const syncOrders = createAsyncThunk('shipment/sync', async (_, { rejectWi
 // NEW: Fetch Shipment History (Fulfilled Orders)
 export const fetchHistory = createAsyncThunk('shipment/history', async (_, { rejectWithValue }) => {
   try {
-    const response = await axios.get('/api/orders?status=fulfilled');
+    const response = await api.get('/api/orders?status=fulfilled');
     return response.data;
   } catch (err) {
     return rejectWithValue(err.response?.data?.message || 'Failed to fetch history');
@@ -29,7 +30,7 @@ export const fetchHistory = createAsyncThunk('shipment/history', async (_, { rej
 // 2. Get Rates for an Order
 export const getRates = createAsyncThunk('shipment/rates', async (data, { rejectWithValue }) => {
   try {
-    const response = await axios.post('/api/shipments/rates', data);
+    const response = await api.post('/api/shipments/rates', data);
     return response.data; // { shipmentId, rates }
   } catch (err) {
     return rejectWithValue(err.response?.data?.message || 'Failed to fetch rates');
@@ -39,7 +40,7 @@ export const getRates = createAsyncThunk('shipment/rates', async (data, { reject
 // 3. Buy Label
 export const buyLabel = createAsyncThunk('shipment/buy', async (data, { rejectWithValue }) => {
   try {
-    const response = await axios.post('/api/shipments/buy', data);
+    const response = await api.post('/api/shipments/buy', data);
     return response.data;
   } catch (err) {
     // Extract the error message sent from the backend

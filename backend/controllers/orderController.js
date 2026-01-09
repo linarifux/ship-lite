@@ -9,7 +9,7 @@ export const syncOrders = async (req, res) => {
     // 1. Fetch from Shopify API
     // Note: If you have multi-tenant auth, pass req.user or shop url here
     const shopifyOrders = await fetchUnfulfilledOrders();
-
+  
     if (!shopifyOrders || shopifyOrders.length === 0) {
       return res.status(200).json({ message: 'No new unfulfilled orders found.' });
     }
